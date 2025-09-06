@@ -7,6 +7,7 @@ import {
   getIssues,
   updateIssue,
   getIssueById,
+  getMyAllIssues,
 } from "../controllers/issueController.js";
 
 const router = express.Router();
@@ -26,6 +27,14 @@ router.get(
   isLoggedIn,
   authorizedRoles("ADMIN", "STAFF","CITIZEN"),
   getIssues
+);
+
+// get all my issues
+router.get(
+  "/me",
+  isLoggedIn,
+  authorizedRoles("ADMIN", "STAFF","CITIZEN"),
+  getMyAllIssues
 );
 
 // Public: get issue by ID

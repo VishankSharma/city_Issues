@@ -146,6 +146,52 @@ const getIssues = async (req, res, next) => {
   }
 };
 
+// ================= Get Issue my all issues=================
+
+const getMyAllIssues = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+
+    // Fetch all issues for logged-in user
+    const issues = await Issue.find({ createdBy: userId })
+      .sort("-createdAt")
+      .populate("assignedTo", "name role")
+      .populate("createdBy", "name avatar");
+
+    // Aggregate counts by status
+    const stats = await Issue.aggregate([
+      { $match: { createdBy: req.user._id } },
+      {
+        $group: {
+          _id: "$status",
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
+    // Transform stats into object
+    let counts = {
+      total: issues.length,
+      PENDING: 0,
+      ACKNOWLEDGED: 0,
+      IN_PROGRESS: 0,
+      RESOLVED: 0,
+      REJECTED: 0,
+    };
+
+    stats.forEach(s => {
+      counts[s._id] = s.count;
+    });
+
+    res.status(200).json({
+      success: true,
+      issues,
+      counts,
+    });
+  } catch (err) {
+    next(new AppError(err.message, 500));
+  }
+};
 
 // ================= Get Issue by ID =================
 const getIssueById = async (req, res, next) => {
@@ -242,4 +288,4 @@ const updateIssue = async (req, res, next) => {
 };
 
 
-export { createIssue, getIssues, getIssueById, updateIssue };
+export { createIssue, getIssues, getIssueById, updateIssue,getMyAllIssues};

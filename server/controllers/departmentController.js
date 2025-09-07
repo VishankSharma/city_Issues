@@ -7,10 +7,15 @@ import AppError from "../utils/error.util.js";
 // ================= CREATE DEPARTMENT =================
 export const createDepartment = async (req, res, next) => {
   try {
-    const { name, description, head } = req.body;
+    const { name, code, description, head, categories } = req.body;
 
-    if (!name || !description || !head) {
-      return next(new AppError("All fields are required", 400));
+    if (!name || !code || !description || !head || !categories?.length) {
+      return next(
+        new AppError(
+          "All fields are required: name, code, description, head, categories",
+          400
+        )
+      );
     }
 
     const headUser = await User.findById(head);
@@ -18,7 +23,13 @@ export const createDepartment = async (req, res, next) => {
       return next(new AppError("Head user not found", 404));
     }
 
-    const department = await Department.create({ name, description, head });
+    const department = await Department.create({
+      name,
+      code,
+      description,
+      head,
+      categories, // 🔥 assign categories to dept
+    });
 
     res.status(201).json({
       success: true,

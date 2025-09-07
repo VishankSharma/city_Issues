@@ -34,52 +34,65 @@ const seed = async () => {
     console.log("🗑️ Old data cleared");
 
     // ================= Departments =================
-    const deptNames = [
-      "Sanitation",
-      "Water Supply",
-      "Roads & Transport",
-      "Electricity",
-      "Parks & Greenery",
+    const deptData = [
+      { name: "Public Works", code: "PUBLIC_WORKS" },
+      { name: "Electrical", code: "ELECTRICAL" },
+      { name: "Sanitation", code: "SANITATION" },
+      { name: "Water Supply", code: "WATER_SUPPLY" },
+      { name: "General", code: "GENERAL" },
     ];
-    const departments = await Department.insertMany(
-      deptNames.map((name) => ({ name }))
-    );
+
+    const departments = await Department.insertMany(deptData);
     console.log(`🏢 Departments Created: ${departments.length}`);
+
+    // Map departments by code
+    const deptMap = {};
+    departments.forEach((dept) => {
+      deptMap[dept.code] = dept._id;
+    });
+
+    // Map categories → departments
+    const categoryDeptMap = {
+      POTHOLE: "PUBLIC_WORKS",
+      STREETLIGHT: "ELECTRICAL",
+      GARBAGE: "SANITATION",
+      WATER: "WATER_SUPPLY",
+      OTHER: "GENERAL",
+    };
 
     // ================= Users =================
     const saltRounds = parseInt(process.env.SALT_ROUNDS) || 10;
 
     // Admin
-    const admin = await User.create({
+    await User.create({
       name: "Admin User",
       email: "admin@test.com",
       password: await bcrypt.hash("Admin@123", saltRounds),
       role: "ADMIN",
       isVerified: true,
     });
+    console.log("👨‍💼 Admin Created");
 
-    // Staff
-    const staff1 = await User.create({
-      name: "Staff One",
-      email: "staff1@test.com",
-      password: await bcrypt.hash("Staff@123", saltRounds),
-      role: "STAFF",
-      department: departments[0]._id,
-      isVerified: true,
-    });
+    // Staff (20 minimum)
+    const staffData = [];
+    const staffCount = 20;
+    const deptCodes = Object.keys(deptMap);
 
-    const staff2 = await User.create({
-      name: "Staff Two",
-      email: "staff2@test.com",
-      password: await bcrypt.hash("Staff@123", saltRounds),
-      role: "STAFF",
-      department: departments[1]._id,
-      isVerified: true,
-    });
+    for (let i = 1; i <= staffCount; i++) {
+      const deptCode = deptCodes[i % deptCodes.length]; // rotate departments
+      staffData.push({
+        name: `Staff ${i}`,
+        email: `staff${i}@test.com`,
+        password: await bcrypt.hash("Staff@123", saltRounds),
+        role: "STAFF",
+        department: deptMap[deptCode],
+        isVerified: true,
+      });
+    }
+    const staff = await User.insertMany(staffData);
+    console.log(`👨‍🔧 Staff Created: ${staff.length}`);
 
-    console.log("👨‍💼 Admin & Staff Created");
-
-    // Citizens
+    // Citizens (22)
     const citizensData = [];
     for (let i = 1; i <= 22; i++) {
       citizensData.push({
@@ -106,12 +119,15 @@ const seed = async () => {
     const issuesData = [];
     for (let i = 0; i < 30; i++) {
       const citizen = citizens[i % citizens.length];
+      const category = categories[i % categories.length];
+
+      const deptCode = categoryDeptMap[category] || "GENERAL";
+      const deptId = deptMap[deptCode];
+
       issuesData.push({
         title: `Issue ${i + 1} reported by ${citizen.name}`,
-        description: `This is a detailed description for issue ${
-          i + 1
-        }, reported by ${citizen.name}.`,
-        category: categories[i % categories.length],
+        description: `This is a detailed description for issue ${i + 1}, reported by ${citizen.name}.`,
+        category,
         media: [
           {
             type: "IMAGE",
@@ -125,22 +141,20 @@ const seed = async () => {
           coordinates: [77.2 + i * 0.01, 28.6 + i * 0.01],
         },
         createdBy: citizen._id,
-        department: departments[i % departments.length]._id,
+        department: deptId,
         status: "PENDING",
         priority: i % 2 === 0 ? "LOW" : "MEDIUM",
       });
     }
 
-   const issues = await Issue.insertMany(issuesData);
+    const issues = await Issue.insertMany(issuesData);
 
-// Link issues back to citizens
-for (const issue of issues) {
-  await User.findByIdAndUpdate(issue.createdBy, {
-    $push: { issues: issue._id },
-  });
-}
+    // Link issues back to citizens
+    for (const issue of issues) {
+      await User.findByIdAndUpdate(issue.createdBy, { $push: { issues: issue._id } });
+    }
 
-console.log(`📌 Issues Created & Linked to Citizens: ${issues.length}`);
+    console.log(`📌 Issues Created & Linked to Citizens: ${issues.length}`);
 
     console.log("✅ Database Seeded Successfully!");
     process.exit(0);

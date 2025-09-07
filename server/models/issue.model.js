@@ -71,14 +71,14 @@ const issueSchema = new Schema(
       type: Schema.Types.ObjectId,
       ref: "User", // STAFF id
     },
-    
+
     // ✅ Track department (for STAFF assignment)
     department: {
       type: Schema.Types.ObjectId,
       ref: "Department",
-      default: null,
+      required: true, 
     },
-
+    
     // ✅ Track when issue was resolved (for SLA analytics)
     resolvedAt: {
       type: Date,

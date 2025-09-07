@@ -15,6 +15,7 @@ const cookieOption = {
 const register = async (req, res, next) => {
   try {
     const { name, email, password, role } = req.body;
+    console.log(name, email, password, role )
 
     if (!name || !email || !password) {
       return next(new AppError("All fields are required", 400));
@@ -53,7 +54,7 @@ const register = async (req, res, next) => {
         return next(new AppError(error.message || "File upload failed", 500));
       } finally {
         // Cleanup local file
-        await fs.unlink(req.file.path).catch(() => {});
+        await fs.unlink(req.file.path).catch(() => { });
       }
     }
 
@@ -99,7 +100,7 @@ const login = async (req, res, next) => {
     return res.status(200).json({
       success: true,
       message: "User logged in successfully",
-      user,
+      user: user.toJSON(),  // ensures id instead of _id
       token,
     });
   } catch (error) {
@@ -248,7 +249,7 @@ const updateUser = async (req, res, next) => {
     if (req.file) {
       // Delete previous avatar
       if (user.avatar.public_id) {
-        await cloudinary.v2.uploader.destroy(user.avatar.public_id).catch(() => {});
+        await cloudinary.v2.uploader.destroy(user.avatar.public_id).catch(() => { });
       }
 
       try {
@@ -265,7 +266,7 @@ const updateUser = async (req, res, next) => {
       } catch (error) {
         return next(new AppError(error.message || "Avatar upload failed", 500));
       } finally {
-        await fs.unlink(req.file.path).catch(() => {}); // cleanup
+        await fs.unlink(req.file.path).catch(() => { }); // cleanup
       }
     }
 

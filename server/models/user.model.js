@@ -3,6 +3,19 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 
+// ================= Sub-schemas =================
+const transactionSchema = new Schema({
+  description: { type: String, required: true },
+  coins: { type: Number, required: true }, // +ve earn, -ve spend
+  date: { type: Date, default: Date.now },
+});
+
+const achievementSchema = new Schema({
+  name: { type: String, required: true },
+  description: { type: String },
+  unlockedAt: { type: Date, default: Date.now },
+});
+
 // ================= User Schema =================
 const userSchema = new Schema(
   {
@@ -44,15 +57,13 @@ const userSchema = new Schema(
       default: "CITIZEN",
     },
 
-    isVerified: {
-      type: Boolean,
-      default: false,
-    },
+    isVerified: { type: Boolean, default: false },
 
-    // 🚀 Points for citizen contribution
-    points: {
-      type: Number,
-      default: 0,
+    // 🚀 Wallet system (coins, transactions, achievements)
+    wallet: {
+      balance: { type: Number, default: 0, min: 0 },
+      transactions: [transactionSchema],
+      achievements: [achievementSchema],
     },
 
     // ✅ Forgot Password
@@ -60,21 +71,24 @@ const userSchema = new Schema(
     forgotPasswordExpiry: Date,
 
     // ✅ Track all issues created by this user
-    issues: [
-      {
-        type: Schema.Types.ObjectId,
-        ref: "Issue",
-      },
-    ],
+    issues: [{ type: Schema.Types.ObjectId, ref: "Issue" }],
 
     // ✅ For Staff members (optional)
-    department: {
-      type: Schema.Types.ObjectId,
-      ref: "Department",
-      default: null,
-    },
+    department: { type: Schema.Types.ObjectId, ref: "Department", default: null },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+    toJSON: {
+      virtuals: true,
+      transform: (_, ret) => {
+        ret.id = ret._id; // replace _id with id
+        delete ret._id;
+        delete ret.__v;
+        return ret;
+      },
+    },
+    toObject: { virtuals: true },
+  }
 );
 
 // ================= Middleware =================
@@ -92,39 +106,32 @@ userSchema.pre("save", async function (next) {
 
 // ================= Instance Methods =================
 userSchema.methods = {
-  // 🔑 Generate JWT
   getJwtToken() {
     if (!process.env.JWT_SECRET) throw new Error("JWT_SECRET not defined");
     return jwt.sign(
-      { id: this._id, email: this.email, role: this.role, avatar: this.avatar },
+      { id: this._id, email: this.email, role: this.role },
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES || "1d" }
     );
   },
 
-  // 🔑 Compare Password
   async comparePassword(plainPassword) {
     return await bcrypt.compare(plainPassword, this.password);
   },
 
-  // 🔑 Generate Reset Password Token
   getResetPasswordToken() {
     const resetToken = crypto.randomBytes(32).toString("hex");
-
     this.forgotPasswordToken = crypto
       .createHash("sha256")
       .update(resetToken)
       .digest("hex");
 
-    const resetExpiry =
-      (parseInt(process.env.RESET_TOKEN_EXPIRE) || 15) * 60 * 1000;
-
-    this.forgotPasswordExpiry = Date.now() + resetExpiry;
+    this.forgotPasswordExpiry =
+      Date.now() + (parseInt(process.env.RESET_TOKEN_EXPIRE) || 15) * 60 * 1000;
 
     return resetToken;
   },
 };
 
-// ================= Model =================
 const User = model("User", userSchema);
 export default User;
